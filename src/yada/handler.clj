@@ -27,10 +27,18 @@
     (instance? java.lang.Throwable e) nil
     :else e))
 
+(defn- client-data?
+  "Returns true if data appears to have come from a http client, else false"
+  [data]
+  (boolean (or (:http-client data) (:aleph/keep-alive? data) (:request data))))
+
 (defn default-error-handler [e]
-  (let [data (error-data e)]
+  (let [data (error-data e)
+        status (if (client-data? data)
+                 500
+                 (when (-> data :status number?) (:status data))) ]
     (when-not (::disable-error-logging? data)
-      (when-not (and (-> data :status number?) (< (:status data) 500))
+      (when-not (and status (< status 500))
         (when (instance? java.lang.Throwable e)
           (errorf e "Internal Error %s" (or (some-> data :status str) "")))
         (when data (errorf "ex-data: %s" (dissoc data :ctx)))))))
@@ -116,8 +124,9 @@
              java.lang.Exception
              (fn [e]
                (error-handler e)
-               (let [data (error-data e)]
-                 (let [status (or (:status data) 500)]
+               (let [data (error-data e)
+                     client-data? (client-data? data)]
+                 (let [status (or (when-not client-data? (:status data)) 500)]
 
                    (let [custom-response (get* (:responses resource) status)
                          rep (rep/select-best-representation
@@ -138,7 +147,7 @@
                               rep (assoc-in [:response :produces] rep)
 
                               ;; This primes the body data in case the representation is nil
-                              (contains? data :body)
+                              (and (contains? data :body) (not client-data?))
                               (assoc-in [:response :body] (:body data))
 
                               (contains? data :cookies)

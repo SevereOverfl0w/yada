@@ -123,3 +123,15 @@
       (catch Exception e
         (let [error-handled? (nil? e)]
           (is error-handled? "clojure.lang.ExceptionInfo not caught by handler"))))))
+
+(deftest ignore-http-client-custom-error
+  (try
+    (with-level Level/OFF "yada.handler"
+      (let [h (handler (error-resource
+                         :get
+                         (ex-info "Oh!" {:status 200 :http-client true})))
+            response @(h (request :get "/"))]
+        (is (= 500 (:status response)))))
+    (catch Exception e
+      (let [error-handled? (nil? e)]
+        (is error-handled? "clojure.lang.ExceptionInfo not caught by handler")))))
