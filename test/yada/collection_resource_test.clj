@@ -18,7 +18,7 @@
   (testing "map"
     (let [test-map {:name "Frank"}
           handler (time/do-at (yesterday) (handler test-map))
-          request (mock/request :get "/")
+          request (assoc-in (mock/request :get "/") [:headers "accept"] "application/edn")
           response @(handler request)
           last-modified (some-> response :headers (get "last-modified") parse-date)]
 
